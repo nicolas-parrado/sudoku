@@ -4,8 +4,6 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.sudoku.data.repository.SudokuRepository
-import com.example.sudoku.domain.engine.DifficultyCurve
-import com.example.sudoku.domain.engine.SudokuGenerator
 import com.example.sudoku.domain.engine.SudokuSolver
 import com.example.sudoku.domain.model.BoardHistory
 import com.example.sudoku.domain.model.BoardState
@@ -52,10 +50,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val canUndo: Boolean = false,
         val canRedo: Boolean = false,
 
-        // Carga y estadísticas de práctica
+        // Carga y estadísticas de práctica/aventura
         val isLoading: Boolean = false,
         val practiceStats: Map<Int, com.example.sudoku.data.local.PracticeStatsEntity> = emptyMap(),
-        val hintsRequestedInCurrentGame: Int = 0
+        val hintsRequestedInCurrentGame: Int = 0,
+        val accumulatedTimeSeconds: Long = 0,
+        val accumulatedHintsUsed: Int = 0,
+        val adventureRecord: com.example.sudoku.data.local.AdventureRecordEntity? = null,
+        val isAdventureCompleted: Boolean = false
     )
 
     private val _uiState = MutableStateFlow(GameUiState())
@@ -76,6 +78,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.initializeSeedsIfNeeded()
             loadPracticeStats()
+            loadAdventureRecord()
             // Intentar cargar partidas previas
             loadSavedGame(GameSlot.ADVENTURE)
         }
@@ -86,6 +89,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             val statsList = repository.getAllPracticeStats()
             val statsMap = statsList.associateBy { it.difficulty }
             _uiState.update { it.copy(practiceStats = statsMap) }
+        }
+    }
+
+    fun loadAdventureRecord() {
+        viewModelScope.launch {
+            val record = repository.getAdventureRecord()
+            _uiState.update { it.copy(adventureRecord = record) }
         }
     }
 
@@ -139,7 +149,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         canUndo = undoStack.isNotEmpty(),
                         canRedo = redoStack.isNotEmpty(),
                         activeHint = null,
-                        showVisualHint = false
+                        showVisualHint = false,
+                        accumulatedTimeSeconds = data.accumulatedTimeSeconds,
+                        accumulatedHintsUsed = data.accumulatedHintsUsed,
+                        isAdventureCompleted = false
                     )
                 }
                 updateDisabledNumbers()
@@ -167,44 +180,31 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 ) 
             }
             
-            val difficultyDecimal: Double
-            val minDiff: Double
-            val maxDiff: Double
-
-            if (slot == GameSlot.ADVENTURE) {
+            val difficultyDecimal = if (slot == GameSlot.ADVENTURE) {
                 val lvl = _uiState.value.level
-                val flr = _uiState.value.floor
-                difficultyDecimal = DifficultyCurve.getDifficultyForFloor(lvl, flr)
-                minDiff = maxOf(1.0, difficultyDecimal - 0.5)
-                maxDiff = difficultyDecimal
+                when (lvl) {
+                    in 1..2 -> 0.0
+                    in 3..4 -> 1.0
+                    in 5..6 -> 2.0
+                    in 7..8 -> 3.0
+                    else -> 4.0
+                }
             } else {
-                // Práctica: dificultad entera (1 a 10)
-                val diffInt = _uiState.value.chosenDifficulty
-                minDiff = if (diffInt == 1) 1.0 else (diffInt - 1).toDouble()
-                maxDiff = diffInt.toDouble()
-                difficultyDecimal = diffInt.toDouble()
+                _uiState.value.chosenDifficulty.toDouble()
             }
 
             // Generación o recuperación asíncrona en Dispatchers.Default
             val (puzzle, solution) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                val puzzleStr: String
-                val solutionStr: String
-                if (maxDiff >= 7.0) {
-                    // Dificultades altas: Pool de Room
-                    val seed = repository.getRandomHardSeed(minDiff, maxDiff)
-                    if (seed != null) {
-                        puzzleStr = seed.puzzleString
-                        solutionStr = seed.solutionString
-                    } else {
-                        // Fallback rápido
-                        puzzleStr =   "003020600900305001001806400008102900700000008006708200002609500800203009005010300"
-                        solutionStr = "483921657967345821251876493548132976729564138136798245372689514814253769695417382"
-                    }
+                var puzzleStr = ""
+                var solutionStr = ""
+                val seed = repository.getRandomHardSeed(difficultyDecimal, difficultyDecimal)
+                if (seed != null) {
+                    puzzleStr = seed.puzzleString
+                    solutionStr = seed.solutionString
                 } else {
-                    // Dificultades bajas/medias: Generador en tiempo real
-                    val generated = SudokuGenerator.generate(minDiff, maxDiff)
-                    puzzleStr = generated.puzzle
-                    solutionStr = generated.solution
+                    // Fallback rápido si la BD no está cargada todavía
+                    puzzleStr =   "003020600900305001001806400008102900700000008006708200002609500800203009005010300"
+                    solutionStr = "483921657967345821251876493548132976729564138136798245372689514814253769695417382"
                 }
                 Pair(puzzleStr, solutionStr)
             }
@@ -225,7 +225,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     canRedo = false,
                     activeHint = null,
                     showVisualHint = false,
-                    isLoading = false // Apagamos la animación de carga
+                    isLoading = false,
+                    isAdventureCompleted = false
                 )
             }
             
@@ -252,7 +253,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 chosenDifficulty = state.chosenDifficulty,
                 elapsedSeconds = state.elapsedSeconds,
                 difficulty = state.currentDifficulty,
-                themeName = state.activeTheme.name.lowercase()
+                themeName = state.activeTheme.name.lowercase(),
+                accumulatedTimeSeconds = state.accumulatedTimeSeconds,
+                accumulatedHintsUsed = state.accumulatedHintsUsed
             )
         }
     }
@@ -327,6 +330,23 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
             if (_uiState.value.activeSlot == GameSlot.PRACTICE) {
                 savePracticeCompletionStats()
+            } else {
+                // Modo Aventura: verificar final de la torre
+                val currentFloor = _uiState.value.floor
+                val currentLevel = _uiState.value.level
+                val totalTime = _uiState.value.accumulatedTimeSeconds + _uiState.value.elapsedSeconds
+                val totalHints = _uiState.value.accumulatedHintsUsed + _uiState.value.hintsRequestedInCurrentGame
+
+                if (currentLevel == 10 && currentFloor == 10) {
+                    _uiState.update {
+                        it.copy(
+                            accumulatedTimeSeconds = totalTime,
+                            accumulatedHintsUsed = totalHints,
+                            isAdventureCompleted = true
+                        )
+                    }
+                    saveAdventureCompletionStats(totalTime, totalHints)
+                }
             }
         }
 
@@ -367,6 +387,59 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             }
             repository.savePracticeStats(newStats)
             loadPracticeStats()
+        }
+    }
+
+    private fun saveAdventureCompletionStats(totalTime: Long, totalHints: Int) {
+        viewModelScope.launch {
+            val record = repository.getAdventureRecord()
+            val newRecord = if (record == null) {
+                com.example.sudoku.data.local.AdventureRecordEntity(
+                    bestTimeSeconds = totalTime,
+                    hintsUsed = totalHints,
+                    completedCount = 1
+                )
+            } else {
+                val isNewBest = totalTime < record.bestTimeSeconds
+                val bestTime = if (isNewBest) totalTime else record.bestTimeSeconds
+                val bestHints = if (isNewBest) totalHints else record.hintsUsed
+                record.copy(
+                    bestTimeSeconds = bestTime,
+                    hintsUsed = bestHints,
+                    completedCount = record.completedCount + 1
+                )
+            }
+            repository.saveAdventureRecord(newRecord)
+            loadAdventureRecord()
+        }
+    }
+
+    fun resetAdventure() {
+        viewModelScope.launch {
+            repository.saveGameSlot(
+                slot = GameSlot.ADVENTURE,
+                boardState = BoardState(),
+                undoStack = emptyList(),
+                redoStack = emptyList(),
+                level = 1,
+                floor = 1,
+                chosenDifficulty = 0,
+                elapsedSeconds = 0,
+                difficulty = 0.0,
+                themeName = _uiState.value.activeTheme.name.lowercase(),
+                accumulatedTimeSeconds = 0,
+                accumulatedHintsUsed = 0
+            )
+            _uiState.update {
+                it.copy(
+                    level = 1,
+                    floor = 1,
+                    accumulatedTimeSeconds = 0,
+                    accumulatedHintsUsed = 0,
+                    isAdventureCompleted = false
+                )
+            }
+            startNewGame(GameSlot.ADVENTURE)
         }
     }
 
@@ -533,12 +606,28 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun advanceAdventureFloor() {
         val currentFloor = _uiState.value.floor
         val currentLevel = _uiState.value.level
+        
+        val nextAccumTime = _uiState.value.accumulatedTimeSeconds + _uiState.value.elapsedSeconds
+        val nextAccumHints = _uiState.value.accumulatedHintsUsed + _uiState.value.hintsRequestedInCurrentGame
 
         if (currentFloor < 10) {
-            _uiState.update { it.copy(floor = currentFloor + 1) }
+            _uiState.update {
+                it.copy(
+                    floor = currentFloor + 1,
+                    accumulatedTimeSeconds = nextAccumTime,
+                    accumulatedHintsUsed = nextAccumHints
+                )
+            }
         } else {
             // Avanza de nivel
-            _uiState.update { it.copy(level = currentLevel + 1, floor = 1) }
+            _uiState.update {
+                it.copy(
+                    level = currentLevel + 1,
+                    floor = 1,
+                    accumulatedTimeSeconds = nextAccumTime,
+                    accumulatedHintsUsed = nextAccumHints
+                )
+            }
         }
         startNewGame(GameSlot.ADVENTURE)
     }

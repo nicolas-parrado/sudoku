@@ -15,4 +15,7 @@ interface SeedPuzzleDao {
 
     @Query("SELECT COUNT(*) FROM seed_puzzles")
     suspend fun countSeeds(): Int
+
+    @Query("DELETE FROM seed_puzzles")
+    suspend fun clearAllSeeds()
 }

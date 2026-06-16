@@ -15,4 +15,7 @@ interface PracticeStatsDao {
 
     @Query("SELECT * FROM practice_stats")
     suspend fun getAllStats(): List<PracticeStatsEntity>
+
+    @Query("DELETE FROM practice_stats")
+    suspend fun clearAllStats()
 }

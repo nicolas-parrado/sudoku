@@ -77,7 +77,14 @@ fun GameScreen(
                     val modeTitle = if (state.activeSlot == GameSlot.ADVENTURE) {
                         "Nivel ${state.level} - Piso ${state.floor}"
                     } else {
-                        "Práctica (Dificultad ${state.chosenDifficulty})"
+                        val diffName = when (state.chosenDifficulty) {
+                            0 -> "Fácil"
+                            1 -> "Medio"
+                            2 -> "Difícil"
+                            3 -> "Injusto"
+                            else -> "Extremo"
+                        }
+                        "Práctica ($diffName)"
                     }
                     Text(
                         text = modeTitle,
@@ -188,7 +195,15 @@ fun GameScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             // 5. HINT & COMPLETION CARD
-            if (state.isCompleted) {
+            if (state.isAdventureCompleted) {
+                AdventureVictoryCard(
+                    accumulatedTime = state.accumulatedTimeSeconds,
+                    accumulatedHints = state.accumulatedHintsUsed,
+                    colors = colors,
+                    onReset = { viewModel.resetAdventure() },
+                    onGoToMenu = { viewModel.openMenu() }
+                )
+            } else if (state.isCompleted) {
                 CompletionCard(
                     slot = state.activeSlot,
                     level = state.level,
@@ -515,6 +530,99 @@ private fun formatTime(seconds: Long): String {
     val m = seconds / 60
     val s = seconds % 60
     return String.format("%02d:%02d", m, s)
+}
+
+@Composable
+fun AdventureVictoryCard(
+    accumulatedTime: Long,
+    accumulatedHints: Int,
+    colors: SudokuThemeColors,
+    onReset: () -> Unit,
+    onGoToMenu: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(colors.primary.copy(alpha = 0.15f))
+            .border(2.dp, colors.primary, RoundedCornerShape(16.dp))
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            text = "🎉 ¡TORRE CONQUISTADA! 🎉",
+            color = colors.primary,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.ExtraBold,
+            textAlign = TextAlign.Center
+        )
+        
+        Text(
+            text = "¡Felicidades, Comandante! Has superado los 100 pisos de la torre lógica junto a tu tropa. Tu paciencia, intelecto y constancia han dado frutos.",
+            color = colors.text,
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center,
+            lineHeight = 18.sp
+        )
+        
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(colors.surface.copy(alpha = 0.5f))
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(text = "Tiempo Total:", color = colors.text.copy(alpha = 0.6f), fontSize = 13.sp)
+                Text(text = formatAdventureTimeHelper(accumulatedTime), color = colors.text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(text = "Ayudas Utilizadas:", color = colors.text.copy(alpha = 0.6f), fontSize = 13.sp)
+                Text(text = "$accumulatedHints", color = colors.text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Button(
+                onClick = onReset,
+                colors = ButtonDefaults.buttonColors(containerColor = colors.primary, contentColor = colors.background),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(text = "Nueva Aventura", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
+            Button(
+                onClick = onGoToMenu,
+                colors = ButtonDefaults.buttonColors(containerColor = colors.surface, contentColor = colors.text),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(text = "Volver al Menú", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+private fun formatAdventureTimeHelper(seconds: Long): String {
+    val hours = seconds / 3600
+    val minutes = (seconds % 3600) / 60
+    val secs = seconds % 60
+    return if (hours > 0) {
+        String.format("%dh %02dm %02ds", hours, minutes, secs)
+    } else {
+        String.format("%02d:%02d", minutes, secs)
+    }
 }
 
 private fun getActiveNotesForSelected(state: GameViewModel.GameUiState): Set<Int> {

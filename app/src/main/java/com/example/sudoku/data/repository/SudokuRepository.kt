@@ -10,6 +10,7 @@ import com.example.sudoku.domain.model.BoardState
 import com.example.sudoku.domain.model.GameSlot
 import com.example.sudoku.domain.model.SudokuCell
 import com.example.sudoku.data.local.PracticeStatsEntity
+import com.example.sudoku.data.local.AdventureRecordEntity
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
@@ -23,13 +24,16 @@ class SudokuRepository(private val context: Context) {
     private val gameSlotDao = db.gameSlotDao()
     private val seedPuzzleDao = db.seedPuzzleDao()
     private val practiceStatsDao = db.practiceStatsDao()
+    private val adventureRecordDao = db.adventureRecordDao()
     private val gson = Gson()
 
     /**
-     * Inicializa la base de datos de semillas si está vacía. Lee de seeds_hard.txt en assets.
+     * Inicializa la base de datos de semillas si está vacía o tiene menos de 50000. Lee de seeds_hard.txt en assets.
      */
     suspend fun initializeSeedsIfNeeded() = withContext(Dispatchers.IO) {
-        if (seedPuzzleDao.countSeeds() == 0) {
+        if (seedPuzzleDao.countSeeds() < 50000) {
+            seedPuzzleDao.clearAllSeeds()
+            practiceStatsDao.clearAllStats() // Limpia estadísticas previas para nueva escala de 5 niveles
             val seeds = mutableListOf<SeedPuzzleEntity>()
             try {
                 context.assets.open("seeds_hard.txt").use { inputStream ->
@@ -40,7 +44,7 @@ class SudokuRepository(private val context: Context) {
                             if (parts.size == 3) {
                                 val puzzle = parts[0].trim()
                                 val solution = parts[1].trim()
-                                val difficulty = parts[2].trim().toDoubleOrNull() ?: 7.0
+                                val difficulty = parts[2].trim().toDoubleOrNull() ?: 0.0
                                 val canonicalId = CanonicalNormalization.getCanonicalSeed(puzzle)
                                 seeds.add(
                                     SeedPuzzleEntity(
@@ -55,7 +59,11 @@ class SudokuRepository(private val context: Context) {
                     }
                 }
                 if (seeds.isNotEmpty()) {
-                    seedPuzzleDao.insertSeeds(seeds)
+                    val batchSize = 5000
+                    for (i in 0 until seeds.size step batchSize) {
+                        val batch = seeds.subList(i, minOf(i + batchSize, seeds.size))
+                        seedPuzzleDao.insertSeeds(batch)
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -85,7 +93,9 @@ class SudokuRepository(private val context: Context) {
             chosenDifficulty = entity.chosenDifficulty,
             elapsedSeconds = entity.elapsedSeconds,
             difficulty = entity.difficulty,
-            themeName = entity.activeThemeName
+            themeName = entity.activeThemeName,
+            accumulatedTimeSeconds = entity.accumulatedTimeSeconds,
+            accumulatedHintsUsed = entity.accumulatedHintsUsed
         )
     }
 
@@ -102,7 +112,9 @@ class SudokuRepository(private val context: Context) {
         chosenDifficulty: Int,
         elapsedSeconds: Long,
         difficulty: Double,
-        themeName: String
+        themeName: String,
+        accumulatedTimeSeconds: Long = 0,
+        accumulatedHintsUsed: Int = 0
     ) = withContext(Dispatchers.IO) {
         val boardStateJson = gson.toJson(boardState.cells)
         val undoStackJson = gson.toJson(undoStack)
@@ -118,7 +130,9 @@ class SudokuRepository(private val context: Context) {
             redoStackJson = redoStackJson,
             elapsedSeconds = elapsedSeconds,
             difficulty = difficulty,
-            activeThemeName = themeName
+            activeThemeName = themeName,
+            accumulatedTimeSeconds = accumulatedTimeSeconds,
+            accumulatedHintsUsed = accumulatedHintsUsed
         )
         gameSlotDao.insertSlot(entity)
     }
@@ -143,6 +157,18 @@ class SudokuRepository(private val context: Context) {
         practiceStatsDao.getAllStats()
     }
 
+    suspend fun getAdventureRecord(): AdventureRecordEntity? = withContext(Dispatchers.IO) {
+        adventureRecordDao.getRecord()
+    }
+
+    suspend fun saveAdventureRecord(record: AdventureRecordEntity) = withContext(Dispatchers.IO) {
+        adventureRecordDao.saveRecord(record)
+    }
+
+    suspend fun clearAdventureRecord() = withContext(Dispatchers.IO) {
+        adventureRecordDao.clearRecord()
+    }
+
     data class LoadedSlotData(
         val boardState: BoardState,
         val undoStack: List<BoardHistory>,
@@ -152,6 +178,8 @@ class SudokuRepository(private val context: Context) {
         val chosenDifficulty: Int,
         val elapsedSeconds: Long,
         val difficulty: Double,
-        val themeName: String
+        val themeName: String,
+        val accumulatedTimeSeconds: Long = 0,
+        val accumulatedHintsUsed: Int = 0
     )
 }

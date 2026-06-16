@@ -1,0 +1,39 @@
+# Built artifacts
+**/build/
+*.apk
+*.ap_
+*.aab
+
+# Android Studio / IntelliJ IDEA
+.idea/
+*.iml
+.navigation/
+captures/
+.externalNativeBuild/
+.cxx/
+local.properties
+
+# Gradle
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+venv/
+.venv/
+seeds_temp_*.txt
+null.out.txt
+
+# OS / IDE temp files
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Log files
+*.log

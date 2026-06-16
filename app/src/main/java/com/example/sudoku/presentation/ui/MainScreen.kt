@@ -195,7 +195,11 @@ fun MainScreen(
 
                 Button(
                     onClick = {
-                        viewModel.startNewGame(selectedTab)
+                        if (selectedTab == GameSlot.ADVENTURE) {
+                            viewModel.resetAdventure()
+                        } else {
+                            viewModel.startNewGame(selectedTab)
+                        }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -207,8 +211,9 @@ fun MainScreen(
                     ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
+                    val btnText = if (selectedTab == GameSlot.ADVENTURE) "REINICIAR AVENTURA" else "NUEVA PARTIDA"
                     Text(
-                        text = "NUEVA PARTIDA",
+                        text = btnText,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -284,6 +289,59 @@ fun AdventureSettings(
                 Text(text = "${state.floor}", color = colors.text, fontSize = 28.sp, fontWeight = FontWeight.Bold)
             }
         }
+
+        state.adventureRecord?.let { record ->
+            if (record.completedCount > 0) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(colors.background.copy(alpha = 0.4f))
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "🏆 RÉCORD DE AVENTURA",
+                        color = colors.primary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = "Mejor Tiempo Total:", color = colors.text.copy(alpha = 0.6f), fontSize = 12.sp)
+                        Text(text = formatAdventureTime(record.bestTimeSeconds), color = colors.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = "Ayudas Totales:", color = colors.text.copy(alpha = 0.6f), fontSize = 12.sp)
+                        Text(text = "${record.hintsUsed}", color = colors.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = "Torres Completadas:", color = colors.text.copy(alpha = 0.6f), fontSize = 12.sp)
+                        Text(text = "${record.completedCount}", color = colors.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun formatAdventureTime(seconds: Long): String {
+    val hours = seconds / 3600
+    val minutes = (seconds % 3600) / 60
+    val secs = seconds % 60
+    return if (hours > 0) {
+        String.format("%dh %02dm %02ds", hours, minutes, secs)
+    } else {
+        String.format("%02d:%02d", minutes, secs)
     }
 }
 
@@ -295,11 +353,20 @@ fun PracticeSettings(
 ) {
     var sliderValue by remember(state.chosenDifficulty) { mutableStateOf(state.chosenDifficulty.toFloat()) }
     
+    val diffLabel = when (sliderValue.roundToInt()) {
+        0 -> "Fácil"
+        1 -> "Medio"
+        2 -> "Difícil"
+        3 -> "Injusto"
+        else -> "Extremo"
+    }
+    
     val diffDescription = when (sliderValue.roundToInt()) {
-        in 1..3 -> "Visual / Escaneo Básico"
-        in 4..6 -> "Visual Avanzado & X-Wing"
-        in 7..8 -> "Avanzado / Simple Coloring"
-        else -> "Experto / Bowman's Bingo"
+        0 -> "Escaneo básico, celdas directas."
+        1 -> "Técnicas SSTS, X-Wing, XY-Wing."
+        2 -> "Simple Coloring, Skyscraper, Rectángulos Vacíos."
+        3 -> "Cadenas XY, Forcing Chains, Remote Pairs."
+        else -> "Lógica extrema de Hodoku (sin adivinación)."
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -328,7 +395,7 @@ fun PracticeSettings(
         ) {
             Text(text = "Dificultad:", color = colors.text.copy(alpha = 0.6f), fontSize = 13.sp)
             Text(
-                text = "${sliderValue.roundToInt()}.0",
+                text = diffLabel,
                 color = colors.primary,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
@@ -341,8 +408,8 @@ fun PracticeSettings(
                 sliderValue = it
                 viewModel.setChosenDifficulty(it.roundToInt())
             },
-            valueRange = 1f..10f,
-            steps = 8,
+            valueRange = 0f..4f,
+            steps = 3,
             colors = SliderDefaults.colors(
                 thumbColor = colors.primary,
                 activeTrackColor = colors.primary,
