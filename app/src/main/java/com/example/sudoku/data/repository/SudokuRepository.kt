@@ -95,7 +95,8 @@ class SudokuRepository(private val context: Context) {
             difficulty = entity.difficulty,
             themeName = entity.activeThemeName,
             accumulatedTimeSeconds = entity.accumulatedTimeSeconds,
-            accumulatedHintsUsed = entity.accumulatedHintsUsed
+            accumulatedHintsUsed = entity.accumulatedHintsUsed,
+            coins = entity.coins
         )
     }
 
@@ -114,7 +115,8 @@ class SudokuRepository(private val context: Context) {
         difficulty: Double,
         themeName: String,
         accumulatedTimeSeconds: Long = 0,
-        accumulatedHintsUsed: Int = 0
+        accumulatedHintsUsed: Int = 0,
+        coins: Int = 100
     ) = withContext(Dispatchers.IO) {
         val boardStateJson = gson.toJson(boardState.cells)
         val undoStackJson = gson.toJson(undoStack)
@@ -132,7 +134,8 @@ class SudokuRepository(private val context: Context) {
             difficulty = difficulty,
             activeThemeName = themeName,
             accumulatedTimeSeconds = accumulatedTimeSeconds,
-            accumulatedHintsUsed = accumulatedHintsUsed
+            accumulatedHintsUsed = accumulatedHintsUsed,
+            coins = coins
         )
         gameSlotDao.insertSlot(entity)
     }
@@ -180,6 +183,7 @@ class SudokuRepository(private val context: Context) {
         val difficulty: Double,
         val themeName: String,
         val accumulatedTimeSeconds: Long = 0,
-        val accumulatedHintsUsed: Int = 0
+        val accumulatedHintsUsed: Int = 0,
+        val coins: Int = 100
     )
 }

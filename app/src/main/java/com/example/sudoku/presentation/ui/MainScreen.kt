@@ -267,6 +267,14 @@ fun AdventureSettings(
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold
         )
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Text(text = "🪙 ${state.coins}", color = colors.primary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text(text = " monedas", color = colors.text.copy(alpha = 0.6f), fontSize = 12.sp)
+        }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = "Supera pisos lógicos con dificultad progresiva y enfréntate al Boss en el Piso 10 de cada nivel.",

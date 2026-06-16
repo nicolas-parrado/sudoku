@@ -57,7 +57,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val accumulatedTimeSeconds: Long = 0,
         val accumulatedHintsUsed: Int = 0,
         val adventureRecord: com.example.sudoku.data.local.AdventureRecordEntity? = null,
-        val isAdventureCompleted: Boolean = false
+        val isAdventureCompleted: Boolean = false,
+        val coins: Int = 100,
+        val lastCoinsEarned: Int = 0,
+        val lastTimeBonusEarned: Boolean = false,
+        val nextHintCost: Int = 0
     )
 
     private val _uiState = MutableStateFlow(GameUiState())
@@ -152,7 +156,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         showVisualHint = false,
                         accumulatedTimeSeconds = data.accumulatedTimeSeconds,
                         accumulatedHintsUsed = data.accumulatedHintsUsed,
-                        isAdventureCompleted = false
+                        isAdventureCompleted = false,
+                        coins = data.coins
                     )
                 }
                 updateDisabledNumbers()
@@ -255,7 +260,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 difficulty = state.currentDifficulty,
                 themeName = state.activeTheme.name.lowercase(),
                 accumulatedTimeSeconds = state.accumulatedTimeSeconds,
-                accumulatedHintsUsed = state.accumulatedHintsUsed
+                accumulatedHintsUsed = state.accumulatedHintsUsed,
+                coins = state.coins
             )
         }
     }
@@ -331,11 +337,41 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             if (_uiState.value.activeSlot == GameSlot.PRACTICE) {
                 savePracticeCompletionStats()
             } else {
-                // Modo Aventura: verificar final de la torre
+                // Modo Aventura: calcular monedas y verificar final de la torre
                 val currentFloor = _uiState.value.floor
                 val currentLevel = _uiState.value.level
-                val totalTime = _uiState.value.accumulatedTimeSeconds + _uiState.value.elapsedSeconds
+                val elapsed = _uiState.value.elapsedSeconds
+
+                val baseReward = when (currentLevel) {
+                    in 1..2 -> 50
+                    in 3..4 -> 100
+                    in 5..6 -> 150
+                    in 7..8 -> 200
+                    else -> 250
+                }
+
+                val timeLimitForBonus = when (currentLevel) {
+                    in 1..2 -> 180L // 3 min
+                    in 3..4 -> 300L // 5 min
+                    in 5..6 -> 480L // 8 min
+                    in 7..8 -> 720L // 12 min
+                    else -> 900L // 15 min
+                }
+
+                val gotBonus = elapsed < timeLimitForBonus
+                val bonusReward = if (gotBonus) (baseReward * 0.25).toInt() else 0
+                val totalReward = baseReward + bonusReward
+
+                val totalTime = _uiState.value.accumulatedTimeSeconds + elapsed
                 val totalHints = _uiState.value.accumulatedHintsUsed + _uiState.value.hintsRequestedInCurrentGame
+
+                _uiState.update {
+                    it.copy(
+                        coins = it.coins + totalReward,
+                        lastCoinsEarned = totalReward,
+                        lastTimeBonusEarned = gotBonus
+                    )
+                }
 
                 if (currentLevel == 10 && currentFloor == 10) {
                     _uiState.update {
@@ -428,7 +464,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 difficulty = 0.0,
                 themeName = _uiState.value.activeTheme.name.lowercase(),
                 accumulatedTimeSeconds = 0,
-                accumulatedHintsUsed = 0
+                accumulatedHintsUsed = 0,
+                coins = 100
             )
             _uiState.update {
                 it.copy(
@@ -436,7 +473,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     floor = 1,
                     accumulatedTimeSeconds = 0,
                     accumulatedHintsUsed = 0,
-                    isAdventureCompleted = false
+                    isAdventureCompleted = false,
+                    coins = 100,
+                    lastCoinsEarned = 0,
+                    lastTimeBonusEarned = false
                 )
             }
             startNewGame(GameSlot.ADVENTURE)
@@ -554,25 +594,49 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     // --- SISTEMA DE PISTAS (HINTS) ---
 
     fun requestHint() {
-        if (_uiState.value.isCompleted) return
-        
-        // Pistas exclusivas para Modo Práctica (o libres en modo práctica)
-        // Ejecutamos el solver analítico con el tablero parcial actual
-        val currentPuzzleString = getGivenPlusUserPuzzleString(_uiState.value.boardState)
+        val state = _uiState.value
+        if (state.isCompleted) return
+
+        val currentPuzzleString = getGivenPlusUserPuzzleString(state.boardState)
         val analysis = SudokuSolver.analyze(currentPuzzleString)
 
         if (analysis.nextHint != null) {
-            _uiState.update {
-                it.copy(
-                    activeHint = analysis.nextHint,
-                    showVisualHint = false,
-                    hintsRequestedInCurrentGame = it.hintsRequestedInCurrentGame + 1
-                )
+            val cost = (analysis.nextHint.difficultyRating * 10).toInt()
+            
+            // Verificar economía en modo Aventura
+            if (state.activeSlot == GameSlot.ADVENTURE) {
+                if (state.coins < cost) {
+                    _uiState.update {
+                        it.copy(
+                            activeHint = HintDetail("Monedas insuficientes. Esta pista cuesta $cost 🪙 (Tienes: ${state.coins} 🪙)"),
+                            showVisualHint = false
+                        )
+                    }
+                    return
+                }
+                // Si hay fondos suficientes, cobrar
+                _uiState.update {
+                    it.copy(
+                        coins = it.coins - cost,
+                        activeHint = analysis.nextHint,
+                        showVisualHint = false,
+                        hintsRequestedInCurrentGame = it.hintsRequestedInCurrentGame + 1
+                    )
+                }
+            } else {
+                // Modo Práctica: pista gratis
+                _uiState.update {
+                    it.copy(
+                        activeHint = analysis.nextHint,
+                        showVisualHint = false,
+                        hintsRequestedInCurrentGame = it.hintsRequestedInCurrentGame + 1
+                    )
+                }
             }
+            saveCurrentStateToRoom()
         } else {
             // El resolvedor no encuentra más pistas con las técnicas implementadas
-            // O el tablero ya tiene errores que impiden la lógica estándar
-            if (_uiState.value.conflictingCells.isNotEmpty()) {
+            if (state.conflictingCells.isNotEmpty()) {
                 _uiState.update {
                     it.copy(
                         activeHint = HintDetail("Resuelve primero los conflictos en rojo antes de pedir una pista lógica."),
@@ -674,6 +738,20 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private fun updateConflicts() {
         val conflicts = SudokuSolver.getConflictingCells(_uiState.value.boardState)
         _uiState.update { it.copy(conflictingCells = conflicts) }
+        updateNextHintCost()
+    }
+
+    private fun updateNextHintCost() {
+        val state = _uiState.value
+        if (state.isCompleted) return
+        val currentPuzzleString = getGivenPlusUserPuzzleString(state.boardState)
+        val analysis = SudokuSolver.analyze(currentPuzzleString)
+        val cost = if (analysis.nextHint != null) {
+            (analysis.nextHint.difficultyRating * 10).toInt()
+        } else {
+            0
+        }
+        _uiState.update { it.copy(nextHintCost = cost) }
     }
 
     private fun getGivenPuzzleString(board: BoardState): String {

@@ -46,7 +46,8 @@ object SudokuSolver {
                 if (nextHint == null) {
                     nextHint = HintDetail(
                         explanation = "Naked Single: La celda en la fila ${index / 9 + 1}, columna ${index % 9 + 1} solo puede contener el número $value.",
-                        pivotCells = setOf(index)
+                        pivotCells = setOf(index),
+                        difficultyRating = 1.2
                     )
                 }
                 highestTechniqueUsed = maxOf(highestTechniqueUsed, 1.2)
@@ -64,7 +65,8 @@ object SudokuSolver {
                 if (nextHint == null) {
                     nextHint = HintDetail(
                         explanation = "Hidden Single: En $reason, el número $value solo puede ir en la fila ${index / 9 + 1}, columna ${index % 9 + 1}.",
-                        pivotCells = setOf(index)
+                        pivotCells = setOf(index),
+                        difficultyRating = 1.8
                     )
                 }
                 highestTechniqueUsed = maxOf(highestTechniqueUsed, 1.8)
@@ -272,7 +274,8 @@ object SudokuSolver {
                             HintDetail(
                                 explanation = "Pointing Pair: En el bloque ${b + 1}, el número $num solo puede ir en la fila ${targetRow + 1}. Se elimina $num de las demás celdas de la fila.",
                                 pivotCells = cells.toSet(),
-                                eliminationCells = elimCells
+                                eliminationCells = elimCells,
+                                difficultyRating = 3.8
                             )
                         )
                     }
@@ -296,7 +299,8 @@ object SudokuSolver {
                             HintDetail(
                                 explanation = "Pointing Pair: En el bloque ${b + 1}, el número $num solo puede ir en la columna ${targetCol + 1}. Se elimina $num de las demás celdas de la columna.",
                                 pivotCells = cells.toSet(),
-                                eliminationCells = elimCells
+                                eliminationCells = elimCells,
+                                difficultyRating = 3.8
                             )
                         )
                     }
@@ -335,7 +339,8 @@ object SudokuSolver {
                                     HintDetail(
                                         explanation = "Naked Pair: Las celdas en fila ${r + 1} columnas ${c1 + 1} y ${c2 + 1} contienen el par exclusivo $pairVals. Se eliminan del resto de la fila.",
                                         pivotCells = setOf(idx1, idx2),
-                                        eliminationCells = elimCells
+                                        eliminationCells = elimCells,
+                                        difficultyRating = 2.8
                                     )
                                 )
                             }
@@ -391,7 +396,8 @@ object SudokuSolver {
                                     HintDetail(
                                         explanation = "X-Wing: El número $num está en patrón X-Wing en columnas ${c1 + 1} y ${c2 + 1}, limitando a las filas ${r1 + 1} y ${r2 + 1}. Se elimina $num de las demás celdas en esas filas.",
                                         pivotCells = pivotCells,
-                                        eliminationCells = elimCells
+                                        eliminationCells = elimCells,
+                                        difficultyRating = 5.5
                                     )
                                 )
                             }

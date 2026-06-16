@@ -17,7 +17,8 @@ data class GameSlotEntity(
     val difficulty: Double = 1.0,
     val activeThemeName: String = "slate",
     val accumulatedTimeSeconds: Long = 0,
-    val accumulatedHintsUsed: Int = 0
+    val accumulatedHintsUsed: Int = 0,
+    val coins: Int = 100
 )
 
 @Entity(tableName = "seed_puzzles")

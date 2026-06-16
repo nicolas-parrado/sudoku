@@ -109,16 +109,27 @@ fun GameScreen(
                     }
                 }
 
-                // Botón Configuración
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(colors.surface)
-                        .clickable { showSettings = true },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(text = "⚙", color = colors.text, fontSize = 20.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (state.activeSlot == GameSlot.ADVENTURE) {
+                        Text(
+                            text = "🪙 ${state.coins}",
+                            color = colors.primary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(end = 16.dp)
+                        )
+                    }
+                    // Botón Configuración
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(colors.surface)
+                            .clickable { showSettings = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = "⚙", color = colors.text, fontSize = 20.sp)
+                    }
                 }
             }
 
@@ -209,6 +220,8 @@ fun GameScreen(
                     level = state.level,
                     floor = state.floor,
                     colors = colors,
+                    lastCoinsEarned = state.lastCoinsEarned,
+                    lastTimeBonusEarned = state.lastTimeBonusEarned,
                     onNext = {
                         if (state.activeSlot == GameSlot.ADVENTURE) {
                             viewModel.advanceAdventureFloor()
@@ -217,11 +230,13 @@ fun GameScreen(
                         }
                     }
                 )
-            } else if (state.activeSlot == GameSlot.PRACTICE) {
+            } else {
                 HintSection(
                     activeHint = state.activeHint,
                     showVisualHint = state.showVisualHint,
                     colors = colors,
+                    activeSlot = state.activeSlot,
+                    nextHintCost = state.nextHintCost,
                     onRequestHint = { viewModel.requestHint() },
                     onToggleVisualHint = { viewModel.toggleVisualHint() },
                     onClearHint = { viewModel.clearActiveHint() }
@@ -376,6 +391,8 @@ fun HintSection(
     activeHint: HintDetail?,
     showVisualHint: Boolean,
     colors: SudokuThemeColors,
+    activeSlot: GameSlot,
+    nextHintCost: Int,
     onRequestHint: () -> Unit,
     onToggleVisualHint: () -> Unit,
     onClearHint: () -> Unit
@@ -400,12 +417,17 @@ fun HintSection(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
                 )
+                val buttonText = if (activeSlot == GameSlot.ADVENTURE) {
+                    "Pedir Pista ($nextHintCost 🪙)"
+                } else {
+                    "Pedir Pista (Gratis)"
+                }
                 Button(
                     onClick = onRequestHint,
                     colors = ButtonDefaults.buttonColors(containerColor = colors.primary, contentColor = colors.background),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text(text = "Pedir Pista", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(text = buttonText, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
         } else {
@@ -481,6 +503,8 @@ fun CompletionCard(
     level: Int,
     floor: Int,
     colors: SudokuThemeColors,
+    lastCoinsEarned: Int = 0,
+    lastTimeBonusEarned: Boolean = false,
     onNext: () -> Unit
 ) {
     Column(
@@ -511,6 +535,24 @@ fun CompletionCard(
             fontSize = 15.sp,
             textAlign = TextAlign.Center
         )
+        if (slot == GameSlot.ADVENTURE && lastCoinsEarned > 0) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "🪙 +$lastCoinsEarned monedas ganadas",
+                    color = colors.primary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                if (lastTimeBonusEarned) {
+                    Text(
+                        text = "⚡ ¡Bono de velocidad +25% conseguido!",
+                        color = colors.primary.copy(alpha = 0.8f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
         Button(
             onClick = onNext,
             colors = ButtonDefaults.buttonColors(

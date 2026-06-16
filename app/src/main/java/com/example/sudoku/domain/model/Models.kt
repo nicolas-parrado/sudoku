@@ -55,5 +55,6 @@ data class HintDetail(
     val pivotCells: Set<Int> = emptySet(), // Blue cells in Capa 2
     val eliminationCells: Set<Int> = emptySet(), // Red/orange cells in Capa 2
     val highlightRows: Set<Int> = emptySet(),
-    val highlightCols: Set<Int> = emptySet()
+    val highlightCols: Set<Int> = emptySet(),
+    val difficultyRating: Double = 1.0
 )
