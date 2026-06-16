@@ -16,7 +16,7 @@ object DifficultyCurve {
      */
     fun getDifficultyRangeForLevel(level: Int): DifficultyRange {
         return when (level) {
-            1 -> DifficultyRange(1.0, 3.0)
+            1 -> DifficultyRange(1.2, 3.0)
             2 -> DifficultyRange(2.0, 4.5)
             3 -> DifficultyRange(3.0, 5.5)
             4 -> DifficultyRange(4.0, 6.5)

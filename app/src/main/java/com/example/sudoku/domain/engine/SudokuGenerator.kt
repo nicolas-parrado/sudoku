@@ -16,6 +16,9 @@ object SudokuGenerator {
      * Genera un tablero de Sudoku con una única solución lógica en el rango de dificultad especificado (de 1.0 a 6.0).
      */
     fun generate(minDiff: Double, maxDiff: Double): GeneratedPuzzle {
+        val targetMinDiff = maxOf(1.2, minDiff)
+        val targetMaxDiff = maxOf(1.2, maxDiff)
+
         var attempts = 0
         while (attempts < 100) {
             attempts++
@@ -33,10 +36,10 @@ object SudokuGenerator {
             var cellsRemoved = 0
 
             // Queremos remover celdas hasta que la dificultad esté dentro de los límites o el solver lógico falle.
-            // Para dificultades bajas (1.0-3.0) removemos menos celdas. Para intermedias (3.5-6.0) removemos más.
+            // Para dificultades bajas (1.2-3.0) removemos menos celdas. Para intermedias (3.5-4.5) removemos más.
             val targetRemovals = when {
-                maxDiff <= 3.0 -> 30 + random.nextInt(10) // 30-40 celdas vacías
-                maxDiff <= 4.5 -> 40 + random.nextInt(8)  // 40-48 celdas vacías
+                targetMaxDiff <= 3.0 -> 30 + random.nextInt(10) // 30-40 celdas vacías
+                targetMaxDiff <= 4.5 -> 40 + random.nextInt(8)  // 40-48 celdas vacías
                 else -> 46 + random.nextInt(8)            // 46-54 celdas vacías
             }
 
@@ -50,7 +53,7 @@ object SudokuGenerator {
                 val analysis = SudokuSolver.analyze(puzzleStr)
 
                 // Si se puede resolver lógicamente y no supera la dificultad máxima
-                if (analysis.isSolvableByLogic && analysis.difficulty <= maxDiff) {
+                if (analysis.isSolvableByLogic && analysis.difficulty <= targetMaxDiff) {
                     currentDifficulty = analysis.difficulty
                     cellsRemoved++
                 } else {
@@ -62,7 +65,7 @@ object SudokuGenerator {
             val finalPuzzleStr = puzzleGrid.joinToString("") { it.toString() }
             val finalAnalysis = SudokuSolver.analyze(finalPuzzleStr)
 
-            if (finalAnalysis.isSolvableByLogic && finalAnalysis.difficulty >= minDiff && finalAnalysis.difficulty <= maxDiff) {
+            if (finalAnalysis.isSolvableByLogic && finalAnalysis.difficulty >= targetMinDiff && finalAnalysis.difficulty <= targetMaxDiff) {
                 return GeneratedPuzzle(
                     puzzle = finalPuzzleStr,
                     solution = solutionStr,
@@ -71,8 +74,8 @@ object SudokuGenerator {
             }
         }
         
-        // Fallback rápido si se excede el límite de intentos (retorna un tablero básico válido de dificultad 1.0)
-        return getFallbackPuzzle(minDiff, maxDiff)
+        // Fallback rápido si se excede el límite de intentos (retorna un tablero básico válido de dificultad 1.2)
+        return getFallbackPuzzle(targetMinDiff, targetMaxDiff)
     }
 
     private fun fillBoard(grid: IntArray): Boolean {
