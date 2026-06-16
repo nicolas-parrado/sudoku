@@ -89,6 +89,7 @@ fun GridBoard(
                         val cell = boardState.getCell(index)
 
                         // Lógica de colores de fondo de celda
+                        val selectedVal = selectedCell?.value ?: 0
                         val cellBg = when {
                             // 1. Conflicto / Error (Rojo)
                             conflictingCells.contains(index) -> colors.error.copy(alpha = 0.25f)
@@ -99,6 +100,9 @@ fun GridBoard(
 
                             // 3. Celda seleccionada
                             selectedIndex == index -> colors.selectedCell.copy(alpha = 0.7f)
+
+                            // 3.5. Celdas con el mismo valor que la seleccionada
+                            selectedVal > 0 && cell.value == selectedVal -> colors.primary.copy(alpha = 0.25f)
 
                             // 4. Celdas relacionadas (misma fila, columna o bloque 3x3)
                             selectedCell != null && (cell.row == selectedCell.row || cell.col == selectedCell.col || cell.block == selectedCell.block) -> {
@@ -146,7 +150,7 @@ fun GridBoard(
                                 )
                             } else if (cell.notes.isNotEmpty()) {
                                 // Grilla de notas (3x3 interna)
-                                NoteGrid(notes = cell.notes, colors = colors)
+                                NoteGrid(notes = cell.notes, highlightValue = selectedVal, colors = colors)
                             }
                         }
                     }
@@ -157,7 +161,7 @@ fun GridBoard(
 }
 
 @Composable
-fun NoteGrid(notes: Set<Int>, colors: SudokuThemeColors) {
+fun NoteGrid(notes: Set<Int>, highlightValue: Int, colors: SudokuThemeColors) {
     Column(modifier = Modifier.fillMaxSize().padding(2.dp)) {
         for (row in 0 until 3) {
             Row(
@@ -174,11 +178,12 @@ fun NoteGrid(notes: Set<Int>, colors: SudokuThemeColors) {
                         contentAlignment = Alignment.Center
                     ) {
                         if (notes.contains(noteNum)) {
+                            val isHighlighted = noteNum == highlightValue
                             Text(
                                 text = noteNum.toString(),
-                                color = colors.noteText.copy(alpha = 0.75f),
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Light,
+                                color = if (isHighlighted) colors.primary else colors.noteText.copy(alpha = 0.75f),
+                                fontSize = if (isHighlighted) 10.sp else 8.sp,
+                                fontWeight = if (isHighlighted) FontWeight.ExtraBold else FontWeight.Light,
                                 textAlign = TextAlign.Center
                             )
                         }

@@ -261,6 +261,24 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             // Modo Número: asigna el valor directo y limpia notas
             updatedCells[index] = cell.copy(value = number, notes = emptySet())
+            
+            // FEAT-002: Limpieza automática de notas en la misma fila, columna o bloque 3x3
+            val targetRow = cell.row
+            val targetCol = cell.col
+            val targetBlock = cell.block
+            for (i in 0 until 81) {
+                if (i != index) {
+                    val cellI = updatedCells[i]
+                    if (cellI.value == 0 && cellI.notes.contains(number)) {
+                        val r = i / 9
+                        val c = i % 9
+                        val b = (r / 3) * 3 + (c / 3)
+                        if (r == targetRow || c == targetCol || b == targetBlock) {
+                            updatedCells[i] = cellI.copy(notes = cellI.notes - number)
+                        }
+                    }
+                }
+            }
         }
 
         val nextBoardState = BoardState(updatedCells)
@@ -437,6 +455,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleVisualHint() {
         _uiState.update { it.copy(showVisualHint = !it.showVisualHint) }
+    }
+
+    fun clearActiveHint() {
+        _uiState.update {
+            it.copy(
+                activeHint = null,
+                showVisualHint = false
+            )
+        }
     }
 
     fun advanceAdventureFloor() {

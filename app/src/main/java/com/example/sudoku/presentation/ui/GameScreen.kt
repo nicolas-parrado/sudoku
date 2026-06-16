@@ -197,7 +197,8 @@ fun GameScreen(
                     showVisualHint = state.showVisualHint,
                     colors = colors,
                     onRequestHint = { viewModel.requestHint() },
-                    onToggleVisualHint = { viewModel.toggleVisualHint() }
+                    onToggleVisualHint = { viewModel.toggleVisualHint() },
+                    onClearHint = { viewModel.clearActiveHint() }
                 )
             }
         }
@@ -322,7 +323,8 @@ fun HintSection(
     showVisualHint: Boolean,
     colors: SudokuThemeColors,
     onRequestHint: () -> Unit,
-    onToggleVisualHint: () -> Unit
+    onToggleVisualHint: () -> Unit,
+    onClearHint: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -353,12 +355,27 @@ fun HintSection(
                 }
             }
         } else {
-            Text(
-                text = "Pista Encontrada:",
-                color = colors.primary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Pista Encontrada:",
+                    color = colors.primary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "✕",
+                    color = colors.text.copy(alpha = 0.5f),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .clickable { onClearHint() }
+                        .padding(4.dp)
+                )
+            }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = activeHint.explanation,
@@ -367,13 +384,13 @@ fun HintSection(
                 lineHeight = 18.sp
             )
             
-            if (activeHint.pivotCells.isNotEmpty() || activeHint.eliminationCells.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (activeHint.pivotCells.isNotEmpty() || activeHint.eliminationCells.isNotEmpty()) {
                     Button(
                         onClick = onToggleVisualHint,
                         colors = ButtonDefaults.buttonColors(
@@ -388,13 +405,16 @@ fun HintSection(
                             fontWeight = FontWeight.SemiBold
                         )
                     }
-                    Button(
-                        onClick = onRequestHint,
-                        colors = ButtonDefaults.buttonColors(containerColor = colors.text.copy(alpha = 0.08f), contentColor = colors.text),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(text = "Siguiente", fontSize = 12.sp)
-                    }
+                } else {
+                    Spacer(modifier = Modifier.width(1.dp))
+                }
+                
+                Button(
+                    onClick = onRequestHint,
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.text.copy(alpha = 0.08f), contentColor = colors.text),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(text = "Siguiente Pista", fontSize = 12.sp)
                 }
             }
         }
