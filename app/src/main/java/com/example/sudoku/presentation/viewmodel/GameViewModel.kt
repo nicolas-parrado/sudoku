@@ -50,7 +50,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         
         // Undo / Redo
         val canUndo: Boolean = false,
-        val canRedo: Boolean = false
+        val canRedo: Boolean = false,
+
+        // Carga y estadísticas de práctica
+        val isLoading: Boolean = false,
+        val practiceStats: Map<Int, com.example.sudoku.data.local.PracticeStatsEntity> = emptyMap(),
+        val hintsRequestedInCurrentGame: Int = 0
     )
 
     private val _uiState = MutableStateFlow(GameUiState())
@@ -70,8 +75,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         // Inicializar semillas asíncronamente en el primer inicio
         viewModelScope.launch {
             repository.initializeSeedsIfNeeded()
+            loadPracticeStats()
             // Intentar cargar partidas previas
             loadSavedGame(GameSlot.ADVENTURE)
+        }
+    }
+
+    fun loadPracticeStats() {
+        viewModelScope.launch {
+            val statsList = repository.getAllPracticeStats()
+            val statsMap = statsList.associateBy { it.difficulty }
+            _uiState.update { it.copy(practiceStats = statsMap) }
         }
     }
 
@@ -144,7 +158,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun startNewGame(slot: GameSlot) {
         stopTimer()
         viewModelScope.launch {
-            _uiState.update { it.copy(isMenuOpen = false, activeSlot = slot) }
+            _uiState.update { 
+                it.copy(
+                    isLoading = true, 
+                    isMenuOpen = false, 
+                    activeSlot = slot,
+                    hintsRequestedInCurrentGame = 0 
+                ) 
+            }
             
             val difficultyDecimal: Double
             val minDiff: Double
@@ -164,26 +185,28 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 difficultyDecimal = diffInt.toDouble()
             }
 
-            // Generación o recuperación
-            val puzzle: String
-            val solution: String
-
-            if (maxDiff >= 7.0) {
-                // Dificultades altas: Pool de Room
-                val seed = repository.getRandomHardSeed(minDiff, maxDiff)
-                if (seed != null) {
-                    puzzle = seed.puzzleString
-                    solution = seed.solutionString
+            // Generación o recuperación asíncrona en Dispatchers.Default
+            val (puzzle, solution) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                val puzzleStr: String
+                val solutionStr: String
+                if (maxDiff >= 7.0) {
+                    // Dificultades altas: Pool de Room
+                    val seed = repository.getRandomHardSeed(minDiff, maxDiff)
+                    if (seed != null) {
+                        puzzleStr = seed.puzzleString
+                        solutionStr = seed.solutionString
+                    } else {
+                        // Fallback rápido
+                        puzzleStr =   "003020600900305001001806400008102900700000008006708200002609500800203009005010300"
+                        solutionStr = "483921657967345821251876493548132976729564138136798245372689514814253769695417382"
+                    }
                 } else {
-                    // Fallback rápido
-                    puzzle =   "003020600900305001001806400008102900700000008006708200002609500800203009005010300"
-                    solution = "483921657967345821251876493548132976729564138136798245372689514814253769695417382"
+                    // Dificultades bajas/medias: Generador en tiempo real
+                    val generated = SudokuGenerator.generate(minDiff, maxDiff)
+                    puzzleStr = generated.puzzle
+                    solutionStr = generated.solution
                 }
-            } else {
-                // Dificultades bajas/medias: Generador en tiempo real
-                val generated = SudokuGenerator.generate(minDiff, maxDiff)
-                puzzle = generated.puzzle
-                solution = generated.solution
+                Pair(puzzleStr, solutionStr)
             }
 
             currentSolution = solution
@@ -201,7 +224,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     canUndo = false,
                     canRedo = false,
                     activeHint = null,
-                    showVisualHint = false
+                    showVisualHint = false,
+                    isLoading = false // Apagamos la animación de carga
                 )
             }
             
@@ -300,11 +324,50 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             undoStack.clear()
             redoStack.clear()
             _uiState.update { it.copy(canUndo = false, canRedo = false) }
+
+            if (_uiState.value.activeSlot == GameSlot.PRACTICE) {
+                savePracticeCompletionStats()
+            }
         }
 
         updateDisabledNumbers()
         updateConflicts()
         saveCurrentStateToRoom()
+    }
+
+    private fun savePracticeCompletionStats() {
+        val state = _uiState.value
+        val diffInt = state.chosenDifficulty
+        val currentElapsed = state.elapsedSeconds
+        val currentHints = state.hintsRequestedInCurrentGame
+
+        viewModelScope.launch {
+            val currentStats = repository.getStatsForDifficulty(diffInt)
+            val newStats = if (currentStats == null) {
+                com.example.sudoku.data.local.PracticeStatsEntity(
+                    difficulty = diffInt,
+                    timesPlayed = 1,
+                    bestTimeSeconds = currentElapsed,
+                    recordHintsUsed = currentHints
+                )
+            } else {
+                val bestTime = minOf(currentStats.bestTimeSeconds, currentElapsed)
+                val hintsUsed = if (currentElapsed < currentStats.bestTimeSeconds) {
+                    currentHints
+                } else if (currentElapsed == currentStats.bestTimeSeconds) {
+                    minOf(currentStats.recordHintsUsed, currentHints)
+                } else {
+                    currentStats.recordHintsUsed
+                }
+                currentStats.copy(
+                    timesPlayed = currentStats.timesPlayed + 1,
+                    bestTimeSeconds = bestTime,
+                    recordHintsUsed = hintsUsed
+                )
+            }
+            repository.savePracticeStats(newStats)
+            loadPracticeStats()
+        }
     }
 
     fun clearCell() {
@@ -429,7 +492,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.update {
                 it.copy(
                     activeHint = analysis.nextHint,
-                    showVisualHint = false
+                    showVisualHint = false,
+                    hintsRequestedInCurrentGame = it.hintsRequestedInCurrentGame + 1
                 )
             }
         } else {

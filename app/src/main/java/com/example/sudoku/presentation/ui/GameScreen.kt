@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -89,6 +90,16 @@ fun GameScreen(
                         color = colors.text.copy(alpha = 0.6f),
                         fontSize = 14.sp
                     )
+                    if (state.activeSlot == GameSlot.PRACTICE) {
+                        val stats = state.practiceStats[state.chosenDifficulty]
+                        if (stats != null && stats.timesPlayed > 0) {
+                            Text(
+                                text = "Récord: ${formatTime(stats.bestTimeSeconds)} (Ayudas: ${stats.recordHintsUsed} vs ${state.hintsRequestedInCurrentGame})",
+                                color = colors.text.copy(alpha = 0.6f),
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
                 }
 
                 // Botón Configuración
@@ -200,6 +211,34 @@ fun GameScreen(
                     onToggleVisualHint = { viewModel.toggleVisualHint() },
                     onClearHint = { viewModel.clearActiveHint() }
                 )
+            }
+        }
+
+        if (state.isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(colors.background.copy(alpha = 0.85f))
+                    .clickable(enabled = true, onClickLabel = null, onClick = {}),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    CircularProgressIndicator(
+                        color = colors.primary,
+                        strokeWidth = 4.dp
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Calculando patrones lógicos...",
+                        color = colors.text,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }

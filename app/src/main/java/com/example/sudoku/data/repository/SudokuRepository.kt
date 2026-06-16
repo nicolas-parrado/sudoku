@@ -9,6 +9,7 @@ import com.example.sudoku.domain.model.BoardHistory
 import com.example.sudoku.domain.model.BoardState
 import com.example.sudoku.domain.model.GameSlot
 import com.example.sudoku.domain.model.SudokuCell
+import com.example.sudoku.data.local.PracticeStatsEntity
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +22,7 @@ class SudokuRepository(private val context: Context) {
     private val db = AppDatabase.getDatabase(context)
     private val gameSlotDao = db.gameSlotDao()
     private val seedPuzzleDao = db.seedPuzzleDao()
+    private val practiceStatsDao = db.practiceStatsDao()
     private val gson = Gson()
 
     /**
@@ -127,6 +129,18 @@ class SudokuRepository(private val context: Context) {
     suspend fun getRandomHardSeed(minDiff: Double, maxDiff: Double): SeedPuzzleEntity? = withContext(Dispatchers.IO) {
         initializeSeedsIfNeeded() // Nos aseguramos de tener semillas
         seedPuzzleDao.getRandomSeedInDifficultyRange(minDiff, maxDiff)
+    }
+
+    suspend fun getStatsForDifficulty(difficulty: Int): PracticeStatsEntity? = withContext(Dispatchers.IO) {
+        practiceStatsDao.getStatsForDifficulty(difficulty)
+    }
+
+    suspend fun savePracticeStats(stats: PracticeStatsEntity) = withContext(Dispatchers.IO) {
+        practiceStatsDao.saveStats(stats)
+    }
+
+    suspend fun getAllPracticeStats(): List<PracticeStatsEntity> = withContext(Dispatchers.IO) {
+        practiceStatsDao.getAllStats()
     }
 
     data class LoadedSlotData(

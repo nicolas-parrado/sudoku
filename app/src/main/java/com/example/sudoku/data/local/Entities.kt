@@ -26,3 +26,12 @@ data class SeedPuzzleEntity(
     val solutionString: String,
     val difficulty: Double
 )
+
+@Entity(tableName = "practice_stats")
+data class PracticeStatsEntity(
+    @PrimaryKey
+    val difficulty: Int, // 1 to 10
+    val timesPlayed: Int = 0,
+    val bestTimeSeconds: Long = Long.MAX_VALUE,
+    val recordHintsUsed: Int = 0
+)

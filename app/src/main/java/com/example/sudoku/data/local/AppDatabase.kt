@@ -5,10 +5,11 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [GameSlotEntity::class, SeedPuzzleEntity::class], version = 1, exportSchema = false)
+@Database(entities = [GameSlotEntity::class, SeedPuzzleEntity::class, PracticeStatsEntity::class], version = 1, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun gameSlotDao(): GameSlotDao
     abstract fun seedPuzzleDao(): SeedPuzzleDao
+    abstract fun practiceStatsDao(): PracticeStatsDao
 
     companion object {
         @Volatile

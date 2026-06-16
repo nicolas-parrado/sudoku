@@ -357,5 +357,70 @@ fun PracticeSettings(
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
         )
+
+        val stats = state.practiceStats[sliderValue.roundToInt()]
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        if (stats != null && stats.timesPlayed > 0) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(colors.background.copy(alpha = 0.4f))
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "🏆 RÉCORD PERSONAL",
+                    color = colors.primary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = "Mejor Tiempo:", color = colors.text.copy(alpha = 0.6f), fontSize = 12.sp)
+                    Text(text = formatTime(stats.bestTimeSeconds), color = colors.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = "Ayudas Usadas:", color = colors.text.copy(alpha = 0.6f), fontSize = 12.sp)
+                    Text(text = "${stats.recordHintsUsed}", color = colors.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = "Veces Completado:", color = colors.text.copy(alpha = 0.6f), fontSize = 12.sp)
+                    Text(text = "${stats.timesPlayed}", color = colors.text, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(colors.background.copy(alpha = 0.2f))
+                    .padding(12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "¡Aún no has superado este nivel! Inténtalo para establecer tu récord personal. 💪",
+                    color = colors.text.copy(alpha = 0.7f),
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 16.sp
+                )
+            }
+        }
     }
+}
+
+private fun formatTime(seconds: Long): String {
+    val m = seconds / 60
+    val s = seconds % 60
+    return String.format("%02d:%02d", m, s)
 }
