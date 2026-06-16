@@ -61,7 +61,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val coins: Int = 100,
         val lastCoinsEarned: Int = 0,
         val lastTimeBonusEarned: Boolean = false,
-        val nextHintCost: Int = 0
+        val nextHintCost: Int = 0,
+        
+        // Nuevos poderes
+        val selectedNumpadNumber: Int = 1,
+        val isTimerFrozen: Boolean = false,
+        val frozenTimeRemaining: Long = 0
     )
 
     private val _uiState = MutableStateFlow(GameUiState())
@@ -109,8 +114,25 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             while (true) {
                 delay(1000)
                 if (!_uiState.value.isMenuOpen && !_uiState.value.isCompleted) {
-                    _uiState.update { it.copy(elapsedSeconds = it.elapsedSeconds + 1) }
-                    // Guardar de forma periódica o asincrónica
+                    _uiState.update { state ->
+                        if (state.isTimerFrozen) {
+                            val nextRemaining = state.frozenTimeRemaining - 1
+                            if (nextRemaining <= 0) {
+                                state.copy(
+                                    isTimerFrozen = false,
+                                    frozenTimeRemaining = 0
+                                )
+                            } else {
+                                state.copy(
+                                    frozenTimeRemaining = nextRemaining
+                                )
+                            }
+                        } else {
+                            state.copy(
+                                elapsedSeconds = state.elapsedSeconds + 1
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -274,6 +296,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun inputNumber(number: Int) {
+        _uiState.update { it.copy(selectedNumpadNumber = number) }
         val index = _uiState.value.selectedIndex ?: return
         val cell = _uiState.value.boardState.getCell(index)
         if (cell.isGiven || _uiState.value.isCompleted) return
@@ -327,63 +350,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         if (isDone) {
-            stopTimer()
-            // Si es modo aventura y completó el piso, podemos preparar la UI para avanzar
-            // Borramos historial de undo/redo para el slot al completarse según los requerimientos
-            undoStack.clear()
-            redoStack.clear()
-            _uiState.update { it.copy(canUndo = false, canRedo = false) }
-
-            if (_uiState.value.activeSlot == GameSlot.PRACTICE) {
-                savePracticeCompletionStats()
-            } else {
-                // Modo Aventura: calcular monedas y verificar final de la torre
-                val currentFloor = _uiState.value.floor
-                val currentLevel = _uiState.value.level
-                val elapsed = _uiState.value.elapsedSeconds
-
-                val baseReward = when (currentLevel) {
-                    in 1..2 -> 50
-                    in 3..4 -> 100
-                    in 5..6 -> 150
-                    in 7..8 -> 200
-                    else -> 250
-                }
-
-                val timeLimitForBonus = when (currentLevel) {
-                    in 1..2 -> 180L // 3 min
-                    in 3..4 -> 300L // 5 min
-                    in 5..6 -> 480L // 8 min
-                    in 7..8 -> 720L // 12 min
-                    else -> 900L // 15 min
-                }
-
-                val gotBonus = elapsed < timeLimitForBonus
-                val bonusReward = if (gotBonus) (baseReward * 0.25).toInt() else 0
-                val totalReward = baseReward + bonusReward
-
-                val totalTime = _uiState.value.accumulatedTimeSeconds + elapsed
-                val totalHints = _uiState.value.accumulatedHintsUsed + _uiState.value.hintsRequestedInCurrentGame
-
-                _uiState.update {
-                    it.copy(
-                        coins = it.coins + totalReward,
-                        lastCoinsEarned = totalReward,
-                        lastTimeBonusEarned = gotBonus
-                    )
-                }
-
-                if (currentLevel == 10 && currentFloor == 10) {
-                    _uiState.update {
-                        it.copy(
-                            accumulatedTimeSeconds = totalTime,
-                            accumulatedHintsUsed = totalHints,
-                            isAdventureCompleted = true
-                        )
-                    }
-                    saveAdventureCompletionStats(totalTime, totalHints)
-                }
-            }
+            handleGameCompletion()
         }
 
         updateDisabledNumbers()
@@ -760,5 +727,470 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun getGivenPlusUserPuzzleString(board: BoardState): String {
         return board.cells.joinToString("") { if (it.value != 0) it.value.toString() else "0" }
+    }
+
+    // --- LÓGICA DE PODERES ---
+
+    private fun handleGameCompletion() {
+        stopTimer()
+        undoStack.clear()
+        redoStack.clear()
+        _uiState.update { it.copy(canUndo = false, canRedo = false) }
+
+        if (_uiState.value.activeSlot == GameSlot.PRACTICE) {
+            savePracticeCompletionStats()
+        } else {
+            // Modo Aventura: calcular monedas y verificar final de la torre
+            val currentFloor = _uiState.value.floor
+            val currentLevel = _uiState.value.level
+            val elapsed = _uiState.value.elapsedSeconds
+
+            val baseReward = when (currentLevel) {
+                in 1..2 -> 50
+                in 3..4 -> 100
+                in 5..6 -> 150
+                in 7..8 -> 200
+                else -> 250
+            }
+
+            val timeLimitForBonus = when (currentLevel) {
+                in 1..2 -> 180L // 3 min
+                in 3..4 -> 300L // 5 min
+                in 5..6 -> 480L // 8 min
+                in 7..8 -> 720L // 12 min
+                else -> 900L // 15 min
+            }
+
+            val gotBonus = elapsed < timeLimitForBonus
+            val bonusReward = if (gotBonus) (baseReward * 0.25).toInt() else 0
+            val totalReward = baseReward + bonusReward
+
+            val totalTime = _uiState.value.accumulatedTimeSeconds + elapsed
+            val totalHints = _uiState.value.accumulatedHintsUsed + _uiState.value.hintsRequestedInCurrentGame
+
+            _uiState.update {
+                it.copy(
+                    coins = it.coins + totalReward,
+                    lastCoinsEarned = totalReward,
+                    lastTimeBonusEarned = gotBonus
+                )
+            }
+
+            if (currentLevel == 10 && currentFloor == 10) {
+                _uiState.update {
+                    it.copy(
+                        accumulatedTimeSeconds = totalTime,
+                        accumulatedHintsUsed = totalHints,
+                        isAdventureCompleted = true
+                    )
+                }
+                saveAdventureCompletionStats(totalTime, totalHints)
+            }
+        }
+    }
+
+    fun fillAllNotes() {
+        if (_uiState.value.isCompleted) return
+        val state = _uiState.value
+
+        if (state.activeSlot == GameSlot.ADVENTURE) {
+            if (state.coins < 30) {
+                _uiState.update {
+                    it.copy(
+                        activeHint = HintDetail("Monedas insuficientes. Llenar notas cuesta 30 🪙 (Tienes: ${state.coins} 🪙)"),
+                        showVisualHint = false
+                    )
+                }
+                return
+            }
+            _uiState.update { it.copy(coins = it.coins - 30) }
+        }
+
+        pushToUndoStack()
+
+        val cells = state.boardState.cells
+        val updatedCells = cells.map { cell ->
+            if (cell.value != 0 || cell.isGiven) {
+                cell.copy(notes = emptySet())
+            } else {
+                val index = cell.index
+                val row = cell.row
+                val col = cell.col
+                val block = cell.block
+
+                val possible = (1..9).toMutableSet()
+                for (i in 0 until 81) {
+                    if (i != index) {
+                        val other = cells[i]
+                        if (other.value != 0) {
+                            if (other.row == row || other.col == col || other.block == block) {
+                                possible.remove(other.value)
+                            }
+                        }
+                    }
+                }
+                cell.copy(notes = possible)
+            }
+        }
+
+        _uiState.update {
+            it.copy(
+                boardState = BoardState(updatedCells),
+                canUndo = undoStack.isNotEmpty(),
+                canRedo = redoStack.isNotEmpty()
+            )
+        }
+        saveCurrentStateToRoom()
+    }
+
+    fun revealSelectedCell() {
+        if (_uiState.value.isCompleted) return
+        val state = _uiState.value
+        val index = state.selectedIndex
+        if (index == null) {
+            _uiState.update {
+                it.copy(
+                    activeHint = HintDetail("Selecciona primero una celda vacía para revelar su número."),
+                    showVisualHint = false
+                )
+            }
+            return
+        }
+        val cell = state.boardState.getCell(index)
+        if (cell.isGiven || cell.value != 0) {
+            _uiState.update {
+                it.copy(
+                    activeHint = HintDetail("Solo puedes revelar celdas vacías."),
+                    showVisualHint = false
+                )
+            }
+            return
+        }
+
+        if (state.activeSlot == GameSlot.ADVENTURE) {
+            if (state.coins < 100) {
+                _uiState.update {
+                    it.copy(
+                        activeHint = HintDetail("Monedas insuficientes. Ojo de Halcón cuesta 100 🪙 (Tienes: ${state.coins} 🪙)"),
+                        showVisualHint = false
+                    )
+                }
+                return
+            }
+            _uiState.update { it.copy(coins = it.coins - 100) }
+        }
+
+        pushToUndoStack()
+
+        val correctValue = currentSolution[index].digitToInt()
+        val updatedCells = state.boardState.cells.toMutableList()
+        updatedCells[index] = cell.copy(value = correctValue, notes = emptySet())
+
+        // Limpieza automática de notas en fila, columna o bloque (FEAT-002)
+        val targetRow = cell.row
+        val targetCol = cell.col
+        val targetBlock = cell.block
+        for (i in 0 until 81) {
+            if (i != index) {
+                val cellI = updatedCells[i]
+                if (cellI.value == 0 && cellI.notes.contains(correctValue)) {
+                    val r = i / 9
+                    val c = i % 9
+                    val b = (r / 3) * 3 + (c / 3)
+                    if (r == targetRow || c == targetCol || b == targetBlock) {
+                        updatedCells[i] = cellI.copy(notes = cellI.notes - correctValue)
+                    }
+                }
+            }
+        }
+
+        val nextBoardState = BoardState(updatedCells)
+        val isDone = checkIsCompleted(nextBoardState)
+
+        _uiState.update {
+            it.copy(
+                boardState = nextBoardState,
+                isCompleted = isDone,
+                canUndo = undoStack.isNotEmpty(),
+                canRedo = redoStack.isNotEmpty()
+            )
+        }
+
+        if (isDone) {
+            handleGameCompletion()
+        }
+
+        updateDisabledNumbers()
+        updateConflicts()
+        saveCurrentStateToRoom()
+    }
+
+    fun cleanRedundantNotes() {
+        if (_uiState.value.isCompleted) return
+        val state = _uiState.value
+
+        if (state.activeSlot == GameSlot.ADVENTURE) {
+            if (state.coins < 30) {
+                _uiState.update {
+                    it.copy(
+                        activeHint = HintDetail("Monedas insuficientes. Escoba Lógica cuesta 30 🪙 (Tienes: ${state.coins} 🪙)"),
+                        showVisualHint = false
+                    )
+                }
+                return
+            }
+            _uiState.update { it.copy(coins = it.coins - 30) }
+        }
+
+        pushToUndoStack()
+
+        val cells = state.boardState.cells
+        val updatedCells = cells.map { cell ->
+            if (cell.value != 0 || cell.isGiven) {
+                cell
+            } else {
+                val index = cell.index
+                val row = cell.row
+                val col = cell.col
+                val block = cell.block
+
+                val possible = (1..9).toMutableSet()
+                for (i in 0 until 81) {
+                    if (i != index) {
+                        val other = cells[i]
+                        if (other.value != 0) {
+                            if (other.row == row || other.col == col || other.block == block) {
+                                possible.remove(other.value)
+                            }
+                        }
+                    }
+                }
+                val newNotes = cell.notes.intersect(possible)
+                cell.copy(notes = newNotes)
+            }
+        }
+
+        _uiState.update {
+            it.copy(
+                boardState = BoardState(updatedCells),
+                canUndo = undoStack.isNotEmpty(),
+                canRedo = redoStack.isNotEmpty()
+            )
+        }
+        saveCurrentStateToRoom()
+    }
+
+    fun triggerNumberBomb() {
+        if (_uiState.value.isCompleted) return
+        val state = _uiState.value
+        val targetNumber = state.selectedNumpadNumber
+
+        val emptyCellsWithTarget = state.boardState.cells.filter { cell ->
+            cell.value == 0 && !cell.isGiven && currentSolution[cell.index].digitToInt() == targetNumber
+        }
+
+        if (emptyCellsWithTarget.isEmpty()) {
+            _uiState.update {
+                it.copy(
+                    activeHint = HintDetail("No quedan celdas vacías para el número $targetNumber."),
+                    showVisualHint = false
+                )
+            }
+            return
+        }
+
+        if (state.activeSlot == GameSlot.ADVENTURE) {
+            if (state.coins < 50) {
+                _uiState.update {
+                    it.copy(
+                        activeHint = HintDetail("Monedas insuficientes. Bomba de Números cuesta 50 🪙 (Tienes: ${state.coins} 🪙)"),
+                        showVisualHint = false
+                    )
+                }
+                return
+            }
+            _uiState.update { it.copy(coins = it.coins - 50) }
+        }
+
+        pushToUndoStack()
+
+        val randomCell = emptyCellsWithTarget.random()
+        val index = randomCell.index
+        val updatedCells = state.boardState.cells.toMutableList()
+        updatedCells[index] = randomCell.copy(value = targetNumber, notes = emptySet())
+
+        // Limpieza automática de notas en fila, columna o bloque (FEAT-002)
+        val targetRow = randomCell.row
+        val targetCol = randomCell.col
+        val targetBlock = randomCell.block
+        for (i in 0 until 81) {
+            if (i != index) {
+                val cellI = updatedCells[i]
+                if (cellI.value == 0 && cellI.notes.contains(targetNumber)) {
+                    val r = i / 9
+                    val c = i % 9
+                    val b = (r / 3) * 3 + (c / 3)
+                    if (r == targetRow || c == targetCol || b == targetBlock) {
+                        updatedCells[i] = cellI.copy(notes = cellI.notes - targetNumber)
+                    }
+                }
+            }
+        }
+
+        val nextBoardState = BoardState(updatedCells)
+        val isDone = checkIsCompleted(nextBoardState)
+
+        _uiState.update {
+            it.copy(
+                boardState = nextBoardState,
+                isCompleted = isDone,
+                canUndo = undoStack.isNotEmpty(),
+                canRedo = redoStack.isNotEmpty()
+            )
+        }
+
+        if (isDone) {
+            handleGameCompletion()
+        }
+
+        updateDisabledNumbers()
+        updateConflicts()
+        saveCurrentStateToRoom()
+    }
+
+    fun autoCompleteSingles() {
+        if (_uiState.value.isCompleted) return
+        val state = _uiState.value
+
+        val cells = state.boardState.cells
+        val singlesToFill = mutableMapOf<Int, Int>()
+
+        for (cell in cells) {
+            if (cell.value == 0 && !cell.isGiven) {
+                val index = cell.index
+                val row = cell.row
+                val col = cell.col
+                val block = cell.block
+
+                val possible = (1..9).toMutableSet()
+                for (i in 0 until 81) {
+                    if (i != index) {
+                        val other = cells[i]
+                        if (other.value != 0) {
+                            if (other.row == row || other.col == col || other.block == block) {
+                                possible.remove(other.value)
+                            }
+                        }
+                    }
+                }
+                if (possible.size == 1) {
+                    singlesToFill[index] = possible.first()
+                }
+            }
+        }
+
+        if (singlesToFill.isEmpty()) {
+            _uiState.update {
+                it.copy(
+                    activeHint = HintDetail("No se encontraron celdas con un único candidato lógico (Naked Singles) en este momento."),
+                    showVisualHint = false
+                )
+            }
+            return
+        }
+
+        if (state.activeSlot == GameSlot.ADVENTURE) {
+            if (state.coins < 120) {
+                _uiState.update {
+                    it.copy(
+                        activeHint = HintDetail("Monedas insuficientes. Ráfaga de Singles cuesta 120 🪙 (Tienes: ${state.coins} 🪙)"),
+                        showVisualHint = false
+                    )
+                }
+                return
+            }
+            _uiState.update { it.copy(coins = it.coins - 120) }
+        }
+
+        pushToUndoStack()
+
+        val updatedCells = cells.toMutableList()
+        for ((index, value) in singlesToFill) {
+            updatedCells[index] = updatedCells[index].copy(value = value, notes = emptySet())
+        }
+
+        for ((index, value) in singlesToFill) {
+            val cell = updatedCells[index]
+            val targetRow = cell.row
+            val targetCol = cell.col
+            val targetBlock = cell.block
+            for (i in 0 until 81) {
+                if (i != index && !singlesToFill.containsKey(i)) {
+                    val cellI = updatedCells[i]
+                    if (cellI.value == 0 && cellI.notes.contains(value)) {
+                        val r = i / 9
+                        val c = i % 9
+                        val b = (r / 3) * 3 + (c / 3)
+                        if (r == targetRow || c == targetCol || b == targetBlock) {
+                            updatedCells[i] = cellI.copy(notes = cellI.notes - value)
+                        }
+                    }
+                }
+            }
+        }
+
+        val nextBoardState = BoardState(updatedCells)
+        val isDone = checkIsCompleted(nextBoardState)
+
+        _uiState.update {
+            it.copy(
+                boardState = nextBoardState,
+                isCompleted = isDone,
+                canUndo = undoStack.isNotEmpty(),
+                canRedo = redoStack.isNotEmpty()
+            )
+        }
+
+        if (isDone) {
+            handleGameCompletion()
+        }
+
+        updateDisabledNumbers()
+        updateConflicts()
+        saveCurrentStateToRoom()
+    }
+
+    fun freezeTime() {
+        if (_uiState.value.isCompleted) return
+        val state = _uiState.value
+
+        if (state.activeSlot == GameSlot.ADVENTURE) {
+            if (state.coins < 40) {
+                _uiState.update {
+                    it.copy(
+                        activeHint = HintDetail("Monedas insuficientes. Congelar Tiempo cuesta 40 🪙 (Tienes: ${state.coins} 🪙)"),
+                        showVisualHint = false
+                    )
+                }
+                return
+            }
+            _uiState.update { it.copy(coins = it.coins - 40) }
+        }
+
+        val limit = when (state.level) {
+            in 1..2 -> 180L
+            in 3..4 -> 300L
+            in 5..6 -> 480L
+            in 7..8 -> 720L
+            else -> 900L
+        }
+        val duration = limit / 2
+
+        _uiState.update {
+            it.copy(
+                isTimerFrozen = true,
+                frozenTimeRemaining = duration
+            )
+        }
     }
 }

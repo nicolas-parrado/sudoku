@@ -1,5 +1,6 @@
 package com.example.sudoku.presentation.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,6 +25,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -35,10 +37,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import com.example.sudoku.R
 import com.example.sudoku.domain.model.GameSlot
 import com.example.sudoku.domain.model.HintDetail
 import com.example.sudoku.presentation.theme.SudokuThemeColors
@@ -52,6 +57,7 @@ fun GameScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     var showSettings by remember { mutableStateOf(false) }
+    var showPowerups by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
     Box(
@@ -92,11 +98,25 @@ fun GameScreen(
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Text(
-                        text = "Tiempo: ${formatTime(state.elapsedSeconds)}",
-                        color = colors.text.copy(alpha = 0.6f),
-                        fontSize = 14.sp
-                    )
+                    
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Tiempo: ${formatTime(state.elapsedSeconds)}",
+                            color = if (state.isTimerFrozen) Color(0xFF29B6F6) else colors.text.copy(alpha = 0.6f),
+                            fontSize = 14.sp,
+                            fontWeight = if (state.isTimerFrozen) FontWeight.Bold else FontWeight.Normal
+                        )
+                        if (state.isTimerFrozen) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "❄️ ${state.frozenTimeRemaining}s",
+                                color = Color(0xFF29B6F6),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
                     if (state.activeSlot == GameSlot.PRACTICE) {
                         val stats = state.practiceStats[state.chosenDifficulty]
                         if (stats != null && stats.timesPlayed > 0) {
@@ -149,7 +169,17 @@ fun GameScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 3. CONTROL PANEL (Panel de Control)
+            // 3. NUMPAD (Teclado) - Colocado inmediatamente debajo del tablero
+            Numpad(
+                disabledNumbers = state.disabledNumbers,
+                activeNotesForSelected = getActiveNotesForSelected(state),
+                colors = colors,
+                onNumberInput = { viewModel.inputNumber(it) }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 4. CONTROL PANEL (Panel de Control) - Colocado abajo del Numpad
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
@@ -157,7 +187,7 @@ fun GameScreen(
             ) {
                 // Deshacer (Undo)
                 ControlButton(
-                    text = "↩",
+                    iconResId = R.drawable.ic_undo,
                     label = "Deshacer",
                     enabled = state.canUndo && !state.isCompleted,
                     colors = colors,
@@ -166,7 +196,7 @@ fun GameScreen(
 
                 // Rehacer (Redo)
                 ControlButton(
-                    text = "↪",
+                    iconResId = R.drawable.ic_redo,
                     label = "Rehacer",
                     enabled = state.canRedo && !state.isCompleted,
                     colors = colors,
@@ -175,7 +205,7 @@ fun GameScreen(
 
                 // Borrar
                 ControlButton(
-                    text = "⌫",
+                    iconResId = R.drawable.ic_delete,
                     label = "Borrar",
                     enabled = state.selectedIndex != null && !state.isCompleted,
                     colors = colors,
@@ -184,24 +214,23 @@ fun GameScreen(
 
                 // Notas Toggle
                 ControlButton(
-                    text = "✎",
+                    iconResId = R.drawable.ic_notes,
                     label = "Notas",
                     enabled = !state.isCompleted,
                     isActive = state.isNoteModeActive,
                     colors = colors,
                     onClick = { viewModel.toggleNoteMode() }
                 )
+
+                // Poderes
+                ControlButton(
+                    iconResId = R.drawable.ic_powerups,
+                    label = "Poderes",
+                    enabled = !state.isCompleted,
+                    colors = colors,
+                    onClick = { showPowerups = true }
+                )
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 4. NUMPAD (Teclado)
-            Numpad(
-                disabledNumbers = state.disabledNumbers,
-                activeNotesForSelected = getActiveNotesForSelected(state),
-                colors = colors,
-                onNumberInput = { viewModel.inputNumber(it) }
-            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -284,11 +313,30 @@ fun GameScreen(
             onDismiss = { showSettings = false }
         )
     }
+
+    // Poderes modal
+    if (showPowerups) {
+        PowerUpsDialog(
+            state = state,
+            colors = colors,
+            onUsePowerUp = { powerId ->
+                when (powerId) {
+                    "auto_notes" -> viewModel.fillAllNotes()
+                    "hawkeye" -> viewModel.revealSelectedCell()
+                    "broom" -> viewModel.cleanRedundantNotes()
+                    "bomb" -> viewModel.triggerNumberBomb()
+                    "singles" -> viewModel.autoCompleteSingles()
+                    "freeze" -> viewModel.freezeTime()
+                }
+            },
+            onDismiss = { showPowerups = false }
+        )
+    }
 }
 
 @Composable
 fun ControlButton(
-    text: String,
+    iconResId: Int,
     label: String,
     enabled: Boolean,
     colors: SudokuThemeColors,
@@ -318,11 +366,11 @@ fun ControlButton(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = text,
-                color = if (isActive) colors.background else if (enabled) colors.text else colors.text.copy(alpha = 0.25f),
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
+            Icon(
+                painter = painterResource(id = iconResId),
+                contentDescription = label,
+                tint = if (isActive) colors.background else if (enabled) colors.text else colors.text.copy(alpha = 0.25f),
+                modifier = Modifier.size(20.dp)
             )
         }
         Spacer(modifier = Modifier.height(4.dp))
@@ -671,3 +719,242 @@ private fun getActiveNotesForSelected(state: GameViewModel.GameUiState): Set<Int
     val index = state.selectedIndex ?: return emptySet()
     return state.boardState.getCell(index).notes
 }
+
+@Composable
+fun PowerUpsDialog(
+    state: GameViewModel.GameUiState,
+    colors: SudokuThemeColors,
+    onUsePowerUp: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = colors.background,
+            border = BorderStroke(1.5.dp, colors.primary.copy(alpha = 0.5f)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Header del Diálogo
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "⚡ Poderes de la Tropa",
+                        color = colors.primary,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        text = "✕",
+                        color = colors.text.copy(alpha = 0.5f),
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .clickable { onDismiss() }
+                            .padding(4.dp)
+                    )
+                }
+
+                if (state.activeSlot == GameSlot.ADVENTURE) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(colors.surface)
+                            .padding(8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Tus Monedas: 🪙 ${state.coins}",
+                            color = colors.primary,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(colors.surface)
+                            .padding(8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Modo Práctica - ¡Poderes Gratuitos!",
+                            color = colors.text.copy(alpha = 0.8f),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                // Lista de Poderes
+                val limit = when (state.level) {
+                    in 1..2 -> 180L
+                    in 3..4 -> 300L
+                    in 5..6 -> 480L
+                    in 7..8 -> 720L
+                    else -> 900L
+                }
+                val freezeSecs = limit / 2
+
+                val powers = listOf(
+                    PowerUpItem(
+                        id = "auto_notes",
+                        name = "Lápiz Mágico",
+                        description = "Rellena todas las notas lógicas válidas en las casillas vacías.",
+                        cost = 30,
+                        iconRes = R.drawable.ic_auto_notes,
+                        color = Color(0xFFFFB74D) // Naranja
+                    ),
+                    PowerUpItem(
+                        id = "hawkeye",
+                        name = "Ojo de Halcón",
+                        description = "Revela el número correcto de la casilla seleccionada.",
+                        cost = 100,
+                        iconRes = R.drawable.ic_hawkeye,
+                        color = Color(0xFF4FC3F7) // Celeste
+                    ),
+                    PowerUpItem(
+                        id = "broom",
+                        name = "Escoba Lógica",
+                        description = "Limpia las notas manuales redundantes o que generen conflicto.",
+                        cost = 30,
+                        iconRes = R.drawable.ic_broom,
+                        color = Color(0xFF81C784) // Verde
+                    ),
+                    PowerUpItem(
+                        id = "bomb",
+                        name = "Bomba de Números",
+                        description = "Revela una casilla vacía aleatoria que lleve el número seleccionado (${state.selectedNumpadNumber}).",
+                        cost = 50,
+                        iconRes = R.drawable.ic_bomb,
+                        color = Color(0xFFE57373) // Rojo/Rosa
+                    ),
+                    PowerUpItem(
+                        id = "singles",
+                        name = "Ráfaga de Singles",
+                        description = "Resuelve todas las celdas que tengan un único candidato lógico posible.",
+                        cost = 120,
+                        iconRes = R.drawable.ic_singles,
+                        color = Color(0xFFBA68C8) // Púrpura
+                    ),
+                    PowerUpItem(
+                        id = "freeze",
+                        name = "Congelar Tiempo",
+                        description = "Congela el reloj por $freezeSecs segundos de cara al bono de velocidad.",
+                        cost = 40,
+                        iconRes = R.drawable.ic_freeze,
+                        color = Color(0xFF4DD0E1), // Cyan/Hielo
+                        enabledInPractice = false
+                    )
+                )
+
+                powers.forEach { power ->
+                    val isAvailable = state.activeSlot == GameSlot.PRACTICE || state.coins >= power.cost
+                    val isPowerEnabled = power.enabledInPractice || state.activeSlot == GameSlot.ADVENTURE
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(colors.surface)
+                            .border(1.dp, colors.gridBorder.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Icono del Poder
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(power.color.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = power.iconRes),
+                                contentDescription = power.name,
+                                tint = power.color,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        // Textos descriptivos
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = power.name,
+                                color = colors.text,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = power.description,
+                                color = colors.text.copy(alpha = 0.6f),
+                                fontSize = 11.sp,
+                                lineHeight = 14.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        // Botón de compra / uso
+                        Button(
+                            onClick = {
+                                onUsePowerUp(power.id)
+                                onDismiss()
+                            },
+                            enabled = isAvailable && isPowerEnabled,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = power.color,
+                                contentColor = colors.background,
+                                disabledContainerColor = colors.gridBorder.copy(alpha = 0.1f),
+                                disabledContentColor = colors.text.copy(alpha = 0.3f)
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            val btnText = if (state.activeSlot == GameSlot.PRACTICE) {
+                                if (!power.enabledInPractice) "No útil" else "Usar"
+                            } else {
+                                "${power.cost} 🪙"
+                            }
+                            Text(
+                                text = btnText,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+data class PowerUpItem(
+    val id: String,
+    val name: String,
+    val description: String,
+    val cost: Int,
+    val iconRes: Int,
+    val color: Color,
+    val enabledInPractice: Boolean = true
+)

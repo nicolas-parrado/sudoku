@@ -27,7 +27,10 @@ __pycache__/
 venv/
 .venv/
 seeds_temp_*.txt
+temp_puzzle.txt
 null.out.txt
+*.out.txt
+
 
 # OS / IDE temp files
 .DS_Store

@@ -61,6 +61,21 @@ Dispone de 3 paletas de colores HSL premium seleccionables desde el menú de con
 2.  **Nordic Frost**: Minimalista con grises nórdicos y acentos menta suave.
 3.  **Cyberpunk / Obsidian**: Negro puro AMOLED con acentos violeta y cian neón.
 
+### ⚡ Sistema de Poderes y Tienda Premium (Poderes de la Tropa)
+Se ha implementado una tienda flotante moderna de poderes lógicos que permite usar monedas ganadas durante el juego (o gratis en el modo Práctica) para realizar acciones tácticas:
+1.  **Lápiz Mágico (Auto Notas)**: Coloca instantáneamente todas las notas lógicas válidas (candidatos) en las casillas vacías de acuerdo al estado del tablero. (Costo: 30 🪙)
+2.  **Ojo de Halcón (Revelar Celda)**: Revela y bloquea el número correcto de la casilla seleccionada. (Costo: 100 🪙)
+3.  **Escoba Lógica (Limpiar Notas)**: Elimina todas las notas del usuario que entren en conflicto directo con los números colocados. (Costo: 30 🪙)
+4.  **Bomba de Números**: Revela una casilla vacía aleatoria en el tablero que contenga en su solución el número seleccionado actualmente en el teclado. (Costo: 50 🪙)
+5.  **Ráfaga de Singles (Autocompletar Singles)**: Resuelve de forma automática todas las celdas vacías que tengan un único candidato lógico posible (Naked Singles) en ese instante. (Costo: 120 🪙)
+6.  **Congelar Tiempo**: Pausa el cronómetro del nivel por una cantidad de segundos equivalente a la mitad del tiempo de bono de velocidad. Durante la congelación, el reloj se ilumina en azul hielo con un copo de nieve `❄️`. (Costo: 40 🪙)
+
+### 🎨 Iconografía Vectorial y Ergonomía
+Se rediseñó la UI reemplazando emojis de texto por recursos de iconos vectoriales XML (`ImageVector` de recursos) en el Panel de Control y en el diálogo de poderes:
+*   **Controles**: Deshacer (`ic_undo`), Rehacer (`ic_redo`), Borrar (`ic_delete`), Notas (`ic_notes`), y la Tienda de Poderes (`ic_powerups`).
+*   **Poderes**: Lápiz Mágico (`ic_auto_notes`), Ojo de Halcón (`ic_hawkeye`), Escoba Lógica (`ic_broom`), Bomba (`ic_bomb`), Ráfaga (`ic_singles`), y Congelado (`ic_freeze`).
+*   **Ergonomía optimizada**: El teclado numérico (`Numpad`) se ubicó directamente debajo del tablero de Sudoku para acercar los números a la zona de interacción principal del pulgar, dejando los botones de control y el disparador de poderes abajo.
+
 ---
 
 ## 🛠️ Cómo Compilar y Ejecutar con Docker
@@ -134,6 +149,18 @@ Sudoku/
         │   │           ├── GridBoard.kt
         │   │           └── SettingsDialog.kt
         │   └── res/
+        │       ├── drawable/
+        │       │   ├── ic_undo.xml
+        │       │   ├── ic_redo.xml
+        │       │   ├── ic_delete.xml
+        │       │   ├── ic_notes.xml
+        │       │   ├── ic_powerups.xml
+        │       │   ├── ic_auto_notes.xml
+        │       │   ├── ic_hawkeye.xml
+        │       │   ├── ic_broom.xml
+        │       │   ├── ic_bomb.xml
+        │       │   ├── ic_singles.xml
+        │       │   └── ic_freeze.xml
         │       ├── values/strings.xml
         │       └── xml/
         │           ├── backup_rules.xml
