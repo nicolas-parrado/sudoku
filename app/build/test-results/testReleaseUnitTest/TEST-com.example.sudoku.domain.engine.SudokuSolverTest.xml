@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.example.sudoku.domain.engine.SudokuSolverTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-06-16T02:24:51" hostname="8efb680f85f0" time="0.067">
+<testsuite name="com.example.sudoku.domain.engine.SudokuSolverTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-06-16T02:43:20" hostname="11220ce202c2" time="0.062">
   <properties/>
-  <testcase name="testLogicalSolverSolvesValidPuzzle" classname="com.example.sudoku.domain.engine.SudokuSolverTest" time="0.062"/>
+  <testcase name="testLogicalSolverSolvesValidPuzzle" classname="com.example.sudoku.domain.engine.SudokuSolverTest" time="0.058"/>
   <testcase name="testVisualConflictDetection" classname="com.example.sudoku.domain.engine.SudokuSolverTest" time="0.004"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>

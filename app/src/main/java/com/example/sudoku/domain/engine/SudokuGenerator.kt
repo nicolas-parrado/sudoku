@@ -32,7 +32,6 @@ object SudokuGenerator {
             val puzzleGrid = solutionGrid.clone()
             val cellIndices = (0 until 81).shuffled(random)
             
-            var currentDifficulty = 1.0
             var cellsRemoved = 0
 
             // Queremos remover celdas hasta que la dificultad esté dentro de los límites o el solver lógico falle.
@@ -54,7 +53,6 @@ object SudokuGenerator {
 
                 // Si se puede resolver lógicamente y no supera la dificultad máxima
                 if (analysis.isSolvableByLogic && analysis.difficulty <= targetMaxDiff) {
-                    currentDifficulty = analysis.difficulty
                     cellsRemoved++
                 } else {
                     // Revertimos la remoción si rompe la lógica o excede la dificultad
@@ -75,7 +73,7 @@ object SudokuGenerator {
         }
         
         // Fallback rápido si se excede el límite de intentos (retorna un tablero básico válido de dificultad 1.2)
-        return getFallbackPuzzle(targetMinDiff, targetMaxDiff)
+        return getFallbackPuzzle()
     }
 
     private fun fillBoard(grid: IntArray): Boolean {
@@ -111,7 +109,7 @@ object SudokuGenerator {
         return true
     }
 
-    private fun getFallbackPuzzle(minDiff: Double, maxDiff: Double): GeneratedPuzzle {
+    private fun getFallbackPuzzle(): GeneratedPuzzle {
         // Tablero semilla precalculado simple de dificultad 1.2
         val puzzle =   "003020600900305001001806400008102900700000008006708200002609500800203009005010300"
         val solution = "483921657967345821251876493548132976729564138136798245372689514814253769695417382"
