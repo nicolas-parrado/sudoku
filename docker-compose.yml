@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  builder:
+    build: .
+    volumes:
+      - .:/app
+      - gradle-cache:/root/.gradle
+    environment:
+      - GRADLE_USER_HOME=/root/.gradle
+    stdin_open: true
+    tty: true
+
+volumes:
+  gradle-cache:
