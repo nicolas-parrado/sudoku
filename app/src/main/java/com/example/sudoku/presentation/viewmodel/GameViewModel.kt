@@ -61,13 +61,49 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val coins: Int = 100,
         val lastCoinsEarned: Int = 0,
         val lastTimeBonusEarned: Boolean = false,
+        val lastBonusEarned: Int = 0,
         val nextHintCost: Int = 0,
         
         // Nuevos poderes
         val selectedNumpadNumber: Int = 1,
         val isTimerFrozen: Boolean = false,
         val frozenTimeRemaining: Long = 0
-    )
+    ) {
+        val baseReward: Int
+            get() = when (level) {
+                in 1..2 -> 50
+                in 3..4 -> 100
+                in 5..6 -> 150
+                in 7..8 -> 200
+                else -> 250
+            }
+
+        val baseBonusReward: Int
+            get() = (baseReward * 0.25).toInt()
+
+        val timeLimitForBonus: Long
+            get() = when (level) {
+                in 1..2 -> 180L // 3 min
+                in 3..4 -> 300L // 5 min
+                in 5..6 -> 480L // 8 min
+                in 7..8 -> 720L // 12 min
+                else -> 900L // 15 min
+            }
+
+        val currentBonusReward: Int
+            get() {
+                if (elapsedSeconds < timeLimitForBonus) {
+                    return baseBonusReward
+                } else {
+                    val minutesOver = ((elapsedSeconds - timeLimitForBonus) / 60).toInt() + 1
+                    var currentBonus = baseBonusReward.toDouble()
+                    repeat(minutesOver) {
+                        currentBonus *= 0.60
+                    }
+                    return kotlin.math.round(currentBonus).toInt()
+                }
+            }
+    }
 
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
@@ -745,24 +781,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             val currentLevel = _uiState.value.level
             val elapsed = _uiState.value.elapsedSeconds
 
-            val baseReward = when (currentLevel) {
-                in 1..2 -> 50
-                in 3..4 -> 100
-                in 5..6 -> 150
-                in 7..8 -> 200
-                else -> 250
-            }
-
-            val timeLimitForBonus = when (currentLevel) {
-                in 1..2 -> 180L // 3 min
-                in 3..4 -> 300L // 5 min
-                in 5..6 -> 480L // 8 min
-                in 7..8 -> 720L // 12 min
-                else -> 900L // 15 min
-            }
-
-            val gotBonus = elapsed < timeLimitForBonus
-            val bonusReward = if (gotBonus) (baseReward * 0.25).toInt() else 0
+            val baseReward = _uiState.value.baseReward
+            val bonusReward = _uiState.value.currentBonusReward
             val totalReward = baseReward + bonusReward
 
             val totalTime = _uiState.value.accumulatedTimeSeconds + elapsed
@@ -772,7 +792,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 it.copy(
                     coins = it.coins + totalReward,
                     lastCoinsEarned = totalReward,
-                    lastTimeBonusEarned = gotBonus
+                    lastBonusEarned = bonusReward,
+                    lastTimeBonusEarned = elapsed < _uiState.value.timeLimitForBonus
                 )
             }
 

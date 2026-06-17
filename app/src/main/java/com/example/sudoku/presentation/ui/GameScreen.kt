@@ -116,6 +116,32 @@ fun GameScreen(
                             )
                         }
                     }
+                    if (state.activeSlot == GameSlot.ADVENTURE) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Meta Bonus: ${formatTime(state.timeLimitForBonus)}",
+                                color = colors.text.copy(alpha = 0.5f),
+                                fontSize = 12.sp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            val currentBonus = state.currentBonusReward
+                            val baseBonus = state.baseBonusReward
+                            val bonusColor = if (currentBonus == baseBonus) {
+                                colors.primary
+                            } else if (currentBonus > 0) {
+                                colors.primary.copy(alpha = 0.7f)
+                            } else {
+                                colors.text.copy(alpha = 0.4f)
+                            }
+                            Text(
+                                text = "Bono: 🪙 $currentBonus",
+                                color = bonusColor,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
 
                     if (state.activeSlot == GameSlot.PRACTICE) {
                         val stats = state.practiceStats[state.chosenDifficulty]
@@ -251,6 +277,7 @@ fun GameScreen(
                     colors = colors,
                     lastCoinsEarned = state.lastCoinsEarned,
                     lastTimeBonusEarned = state.lastTimeBonusEarned,
+                    lastBonusEarned = state.lastBonusEarned,
                     onNext = {
                         if (state.activeSlot == GameSlot.ADVENTURE) {
                             viewModel.advanceAdventureFloor()
@@ -553,6 +580,7 @@ fun CompletionCard(
     colors: SudokuThemeColors,
     lastCoinsEarned: Int = 0,
     lastTimeBonusEarned: Boolean = false,
+    lastBonusEarned: Int = 0,
     onNext: () -> Unit
 ) {
     Column(
@@ -584,21 +612,37 @@ fun CompletionCard(
             textAlign = TextAlign.Center
         )
         if (slot == GameSlot.ADVENTURE && lastCoinsEarned > 0) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                val baseReward = lastCoinsEarned - lastBonusEarned
                 Text(
-                    text = "🪙 +$lastCoinsEarned monedas ganadas",
-                    color = colors.primary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
+                    text = "Recompensa Base: 🪙 $baseReward",
+                    color = colors.text.copy(alpha = 0.8f),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
                 )
-                if (lastTimeBonusEarned) {
+                if (lastBonusEarned > 0) {
+                    val bonusText = if (lastTimeBonusEarned) {
+                        "⚡ ¡Bono de velocidad completo! (+🪙 $lastBonusEarned)"
+                    } else {
+                        "⚡ ¡Bono de velocidad extra! (+🪙 $lastBonusEarned)"
+                    }
                     Text(
-                        text = "⚡ ¡Bono de velocidad +25% conseguido!",
-                        color = colors.primary.copy(alpha = 0.8f),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
+                        text = bonusText,
+                        color = colors.primary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Total ganado: 🪙 $lastCoinsEarned",
+                    color = colors.primary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
             }
         }
         Button(
